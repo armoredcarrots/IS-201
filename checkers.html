@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Checkers Game</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: Arial, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      background-color: #f4f4f4;
+    }
+    .game-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .board {
+      display: grid;
+      grid-template-columns: repeat(8, 80px);
+      grid-template-rows: repeat(8, 80px);
+      border: 2px solid #333;
+    }
+    .square {
+      width: 80px;
+      height: 80px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+    .square.dark {
+      background-color: #666;
+    }
+    .square.light {
+      background-color: #ddd;
+    }
+    .highlight {
+      background-color: rgba(0, 255, 0, 0.5);
+    }
+    .selected {
+      border: 3px solid yellow;
+    }
+    .piece {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      position: relative;
+    }
+    .red {
+      background-color: red;
+    }
+    .black {
+      background-color: black;
+    }
+    .turn {
+      margin: 20px;
+      font-size: 18px;
+    }
+    button {
+      padding: 10px 20px;
+      margin-top: 20px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      cursor: pointer;
+      border-radius: 5px;
+      font-size: 16px;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    .home-link {
+      margin-top: 20px;
+      font-size: 16px;
+      text-decoration: none;
+      color: #007bff;
+    }
+    .home-link:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="game-container">
+    <h1>Checkers Game</h1>
+    <div class="board" id="board"></div>
+    <div class="turn" id="turn">Turn: Red</div>
+    <button onclick="restartGame()">Restart Game</button>
+    <a href="scratch.html" class="home-link">Go to Home</a>
+  </div>
+
+  <script>
+    const boardElement = document.getElementById('board');
+    const turnElement = document.getElementById('turn');
+
+    const initialBoard = () => {
+      const board = Array(8).fill(null).map(() => Array(8).fill(null));
+      for (let row = 0; row < 3; row++) {
+        for (let col = 0; col < 8; col++) {
+          if ((row + col) % 2 === 1) board[row][col] = "b";
+        }
+      }
+      for (let row = 5; row < 8; row++) {
+        for (let col = 0; col < 8; col++) {
+          if ((row + col) % 2 === 1) board[row][col] = "r";
+        }
+      }
+      return board;
+    };
+
+    let board = initialBoard();
+    let selected = null;
+    let turn = 'r';
+
+    const renderBoard = () => {
+      boardElement.innerHTML = '';
+      board.forEach((row, rowIndex) => {
+        row.forEach((cell, colIndex) => {
+          const square = document.createElement('div');
+          square.classList.add('square', (rowIndex + colIndex) % 2 === 0 ? 'light' : 'dark');
+          square.addEventListener('click', () => handleCellClick(rowIndex, colIndex));
+
+          if (selected && selected[0] === rowIndex && selected[1] === colIndex) {
+            square.classList.add('selected');
+          }
+
+          const validMoves = getValidMoves(rowIndex, colIndex);
+          if (validMoves.some(([r, c]) => r === rowIndex && c === colIndex)) {
+            square.classList.add('highlight');
+          }
+
+          if (cell) {
+            const piece = document.createElement('div');
+            piece.classList.add('piece', cell === 'r' ? 'red' : 'black');
+            square.appendChild(piece);
+          }
+
+          boardElement.appendChild(square);
+        });
+      });
+    };
+
+    const getValidMoves = (row, col) => {
+      const piece = board[row][col];
+      if (!piece || piece[0] !== turn) return [];
+
+      const directions = piece === 'r' ? [[-1, -1], [-1, 1]] : [[1, -1], [1, 1]];
+      if (piece === piece.toUpperCase()) directions.push(...directions.map(([dr, dc]) => [-dr, -dc]));
+
+      const moves = [];
+      const jumps = [];
+
+      // Check for regular moves and jumps
+      for (const [dr, dc] of directions) {
+        const [nr, nc] = [row + dr, col + dc];
+        const [jr, jc] = [row + 2 * dr, col + 2 * dc];
+
+        if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8) {
+          if (!board[nr][nc]) {
+            moves.push([nr, nc]);
+          } else if (board[nr][nc][0] !== turn && jr >= 0 && jr < 8 && jc >= 0 && jc < 8 && !board[jr][jc]) {
+            jumps.push([jr, jc]);
+          }
+        }
+      }
+
+      return jumps.length > 0 ? jumps : moves;
+    };
+
+    const movePiece = (toRow, toCol) => {
+      const [fromRow, fromCol] = selected;
+      const piece = board[fromRow][fromCol];
+      const newBoard = board.map(row => [...row]);
+      newBoard[fromRow][fromCol] = null;
+      newBoard[toRow][toCol] = piece;
+
+      if (Math.abs(toRow - fromRow) === 2) {
+        const midRow = (fromRow + toRow) / 2;
+        const midCol = (fromCol + toCol) / 2;
+        newBoard[midRow][midCol] = null;
+      }
+
+      if ((piece === 'r' && toRow === 0) || (piece === 'b' && toRow === 7)) {
+        newBoard[toRow][toCol] = piece.toUpperCase();
+      }
+
+      board = newBoard;
+      selected = [toRow, toCol]; // Keep the selected piece after a move
+      turn = turn === 'r' ? 'b' : 'r';
+      turnElement.textContent = `Turn: ${turn === 'r' ? 'Red' : 'Black'}`;
+      renderBoard();
+    };
+
+    const handleCellClick = (row, col) => {
+      if (selected) {
+        const validMoves = getValidMoves(...selected);
+        if (validMoves.some(([r, c]) => r === row && c === col)) {
+          movePiece(row, col);
+          return;
+        }
+      }
+      if (board[row][col] && board[row][col][0] === turn) {
+        selected = [row, col];
+      } else {
+        selected = null;
+      }
+      renderBoard();
+    };
+
+    const restartGame = () => {
+      board = initialBoard();
+      selected = null;
+      turn = 'r';
+      turnElement.textContent = `Turn: Red`;
+      renderBoard();
+    };
+
+    renderBoard();
+  </script>
+</body>
+</html>
